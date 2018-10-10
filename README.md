@@ -2,18 +2,17 @@ govalidators
 ===========
 golang初学者，在项目开发过程中造了一个简单的验证器轮子，欢迎大大们提宝贵建议和指导
 
-####安装
+#### 安装
   go get github.com/smokezl/govalidators
 
-
-####导入
+#### 导入
 ```go
 import "github.com/smokezl/govalidators"
 ```
 
-####基本使用方式
+#### 基本使用方式
 为 struct 指定验证器
-```
+```go
 package main
 
 import "github.com/smokezl/govalidators"
@@ -37,21 +36,21 @@ type Student struct {
 }
 ```
 验证
-```
+```go
 validator := govalidators.New()
 if err := validator.Validate(student); err != nil {
   fmt.Println(err)
 }
 ```
 
-###自定义验证器
+### 自定义验证器
 
 支持自定义函数，必须满足 ValidatorF 类型，ValidatorF 如下
-```
+```go
 type ValidatorF func(params map[string]interface{}, val reflect.Value, args ...string) (bool, error)
 ```
 自定义函数
-```
+```go
 func validationMethod(params map[string]interface{}, val reflect.Value, args ...string) (bool, error){
   fmt.Println("validationMethod")
   ...
@@ -59,13 +58,13 @@ func validationMethod(params map[string]interface{}, val reflect.Value, args ...
 }
 ```
 支持自定义struct，必须实现 Validator 接口，Validator 如下
-```
+```go
 type Validator interface {
   Validate(params map[string]interface{}, val reflect.Value, args ...string) (bool, error)
 }
 ```
 自定义struct
-```
+```go
 type UserValidator struct {
   EMsg string
 }
@@ -76,7 +75,7 @@ func (self *UserValidator) Validate(params map[string]interface{}, val reflect.V
 }
 ```
 定义好验证器后，初始化验证器
-```
+```go
 validator := govalidators.New()
 validator.SetValidators(map[string]interface{}{
   "user" : &UserValidator{},
@@ -87,7 +86,7 @@ if err := validator.Validate(student); err != nil {
 }
 ```
 也可以对现有的验证器进行参数设置
-```
+```go
 validator := govalidators.New()
 validator.SetValidators(map[string]interface{}{
   "string": &StringValidator{
@@ -108,7 +107,7 @@ if err := validator.Validate(student); err != nil {
   fmt.Println(err)
 }
 ```
-###现有验证器介绍
+### 现有验证器介绍
 
 
 
