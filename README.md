@@ -244,3 +244,5 @@ func (self *goValidator) LazyValidate(s interface{}) (err error)
 ```go
 func (self *goValidator) Validate(s interface{}) (err []error) 
 ```
+
+MIT licence.
