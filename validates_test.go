@@ -490,8 +490,8 @@ type Class struct {
 }
 
 type Student struct {
-	Uid          int64    `validate:"required||integer=1,1000000"`
-	Name         string   `validate:"required||string=1,5"`
+	Uid          int64    `validate:"required||integer=1,1000000" title:"学生ID"`
+	Name         string   `validate:"required||string=1,5" title:"姓名"`
 	Age          int64    `validate:"required||integer=10,30"`
 	Sex          string   `validate:"required||in=male,female"`
 	Email        string   `validate:"email"`
@@ -562,7 +562,7 @@ func TestMuti1(t *testing.T) {
 			PersonalPage: "www.abcd.com",
 			Hobby:        []string{"swimming", "singing"},
 			CreateTime:   "2018-03-03 05:60:00",
-			expected:     false,
+			expected:     true,
 			Class: []Class{
 				Class{
 					Cid:       12345678,

@@ -81,12 +81,14 @@ type goValidator struct {
 	tagName           string
 	skipOnStructEmpty bool
 	validatorSplit    string
+	TitleTag          string
 	validator         map[string]interface{}
 }
 
 func New() *goValidator {
 	return &goValidator{
 		tagName:           "validate",
+		TitleTag:          "title",
 		skipOnStructEmpty: true,
 		validatorSplit:    "||",
 		validator:         defaultValidator,
@@ -95,6 +97,11 @@ func New() *goValidator {
 
 func (self *goValidator) SetTag(tag string) *goValidator {
 	self.tagName = tag
+	return self
+}
+
+func (self *goValidator) SetTitleTag(titleTag string) *goValidator {
+	self.TitleTag = titleTag
 	return self
 }
 
@@ -231,7 +238,9 @@ func (self *goValidator) validate(s interface{}, lazyFlag bool, syncMap *sync.Ma
 //根据 tag 申请验证器进行验证
 func (self *goValidator) validateValueFromTag(tag string, lazyFlag bool, fieldTypeInfo reflect.StructField, fieldInfo reflect.Value, syncMap *sync.Map, parentKey string) (returnErr []error) {
 	validatorT := reflect.TypeOf((*Validator)(nil)).Elem()
-	ValidatorFT := reflect.TypeOf((*ValidatorF)(nil)).Elem()
+	validatorFT := reflect.TypeOf((*ValidatorF)(nil)).Elem()
+	title := fieldTypeInfo.Tag.Get(self.TitleTag)
+	fmt.Println("=======>", title)
 	args := strings.Split(tag, self.validatorSplit)
 	for _, argTmp := range args {
 		var vK string = argTmp
@@ -255,7 +264,7 @@ func (self *goValidator) validateValueFromTag(tag string, lazyFlag bool, fieldTy
 		var validator Validator
 		tmpValidator := self.validator[vK]
 		vT := reflect.TypeOf(tmpValidator)
-		if vT.ConvertibleTo(ValidatorFT) {
+		if vT.ConvertibleTo(validatorFT) {
 			tmpV, ok := tmpValidator.(func(params map[string]interface{}, val reflect.Value, args ...string) (bool, error))
 			if !ok {
 				returnErr = append(returnErr, fmt.Errorf("validator %v error", vK))
@@ -274,8 +283,12 @@ func (self *goValidator) validateValueFromTag(tag string, lazyFlag bool, fieldTy
 			}
 			continue
 		}
+		name := fieldTypeInfo.Name
+		if title != "" {
+			name = title
+		}
 		var params = map[string]interface{}{
-			"name":    fieldTypeInfo.Name,
+			"name":    name,
 			"syncMap": syncMap,
 			"allKey":  parentKey + "_" + fieldTypeInfo.Name,
 		}
