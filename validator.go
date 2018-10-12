@@ -240,7 +240,6 @@ func (self *goValidator) validateValueFromTag(tag string, lazyFlag bool, fieldTy
 	validatorT := reflect.TypeOf((*Validator)(nil)).Elem()
 	validatorFT := reflect.TypeOf((*ValidatorF)(nil)).Elem()
 	title := fieldTypeInfo.Tag.Get(self.TitleTag)
-	fmt.Println("=======>", title)
 	args := strings.Split(tag, self.validatorSplit)
 	for _, argTmp := range args {
 		var vK string = argTmp

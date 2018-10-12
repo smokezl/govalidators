@@ -562,7 +562,7 @@ func TestMuti1(t *testing.T) {
 			PersonalPage: "www.abcd.com",
 			Hobby:        []string{"swimming", "singing"},
 			CreateTime:   "2018-03-03 05:60:00",
-			expected:     true,
+			expected:     false,
 			Class: []Class{
 				Class{
 					Cid:       12345678,
