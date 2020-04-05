@@ -75,14 +75,18 @@ var defaultValidator = map[string]interface{}{
 	"unique":   &UniqueValidator{},
 }
 
-var errorMsg map[string][]string
-
 type goValidator struct {
 	tagName           string
 	skipOnStructEmpty bool
 	validatorSplit    string
 	TitleTag          string
 	validator         map[string]interface{}
+}
+
+type itemParams struct {
+	syncMap         *sync.Map
+	lazyFlag        bool
+	structValidator map[string]Validator
 }
 
 func New() *goValidator {
@@ -128,10 +132,13 @@ func (self *goValidator) SetValidators(validatorMap map[string]interface{}) *goV
 }
 
 func (self *goValidator) LazyValidate(s interface{}) (err error) {
-	syncMap := &sync.Map{}
 	parentKey := "validate"
-	errArr := self.validate(s, true, syncMap, parentKey)
-	syncMap = nil
+	params := &itemParams{
+		syncMap:         &sync.Map{},
+		lazyFlag:        true,
+		structValidator: make(map[string]Validator),
+	}
+	errArr := self.validate(s, parentKey, params)
 	if errArr != nil {
 		err = errArr[0]
 	}
@@ -139,14 +146,17 @@ func (self *goValidator) LazyValidate(s interface{}) (err error) {
 }
 
 func (self *goValidator) Validate(s interface{}) (err []error) {
-	syncMap := &sync.Map{}
 	parentKey := "validate"
-	err = self.validate(s, false, syncMap, parentKey)
-	syncMap = nil
+	params := &itemParams{
+		syncMap:         &sync.Map{},
+		lazyFlag:        false,
+		structValidator: make(map[string]Validator),
+	}
+	err = self.validate(s, parentKey, params)
 	return
 }
 
-func (self *goValidator) validate(s interface{}, lazyFlag bool, syncMap *sync.Map, parentKey string) (returnErr []error) {
+func (self *goValidator) validate(s interface{}, parentKey string, params *itemParams) (returnErr []error) {
 	var errArr []error
 	typeObj := reflect.TypeOf(s)
 	typeValue := reflect.ValueOf(s)
@@ -160,10 +170,10 @@ func (self *goValidator) validate(s interface{}, lazyFlag bool, syncMap *sync.Ma
 		if ok, fieldNum := checkArrayValueIsMulti(typeValue); ok {
 			for i := 0; i < fieldNum; i++ {
 				tmpParentKey := fmt.Sprintf("%v_%v", parentKey, i)
-				errArr = self.validate(typeValue.Index(i).Interface(), lazyFlag, syncMap, tmpParentKey)
+				errArr = self.validate(typeValue.Index(i).Interface(), tmpParentKey, params)
 				if len(errArr) > 0 {
 					returnErr = append(returnErr, errArr...)
-					if lazyFlag {
+					if params.lazyFlag {
 						return
 					}
 					continue
@@ -195,10 +205,10 @@ func (self *goValidator) validate(s interface{}, lazyFlag bool, syncMap *sync.Ma
 				if isZeroValue && !strings.Contains(tag, "required") && !self.skipOnStructEmpty {
 					continue
 				}
-				errArr = self.validateValueFromTag(tag, lazyFlag, fieldTypeInfo, fieldInfo, syncMap, parentKey)
+				errArr = self.validateValueFromTag(tag, parentKey, params, fieldTypeInfo, fieldInfo)
 				if len(errArr) > 0 {
 					returnErr = append(returnErr, errArr...)
-					if lazyFlag {
+					if params.lazyFlag {
 						return
 					}
 					continue
@@ -208,10 +218,10 @@ func (self *goValidator) validate(s interface{}, lazyFlag bool, syncMap *sync.Ma
 			if ok, fieldNum := checkArrayValueIsMulti(fieldInfo); ok {
 				for i := 0; i < fieldNum; i++ {
 					tmpParentKey := fmt.Sprintf("%v_%v", parentKey, fieldTypeInfo.Name)
-					errArr = self.validate(fieldInfo.Index(i).Interface(), lazyFlag, syncMap, tmpParentKey)
+					errArr = self.validate(fieldInfo.Index(i).Interface(), tmpParentKey, params)
 					if len(errArr) > 0 {
 						returnErr = append(returnErr, errArr...)
-						if lazyFlag {
+						if params.lazyFlag {
 							return
 						}
 						continue
@@ -221,10 +231,10 @@ func (self *goValidator) validate(s interface{}, lazyFlag bool, syncMap *sync.Ma
 
 			if fieldType == reflect.Struct {
 				tmpParentKey := fmt.Sprintf("%v_%v", parentKey, fieldTypeInfo.Name)
-				errArr = self.validate(fieldInfo.Interface(), lazyFlag, syncMap, tmpParentKey)
+				errArr = self.validate(fieldInfo.Interface(), tmpParentKey, params)
 				if len(errArr) > 0 {
 					returnErr = append(returnErr, errArr...)
-					if lazyFlag {
+					if params.lazyFlag {
 						return
 					}
 					continue
@@ -236,13 +246,13 @@ func (self *goValidator) validate(s interface{}, lazyFlag bool, syncMap *sync.Ma
 }
 
 //根据 tag 申请验证器进行验证
-func (self *goValidator) validateValueFromTag(tag string, lazyFlag bool, fieldTypeInfo reflect.StructField, fieldInfo reflect.Value, syncMap *sync.Map, parentKey string) (returnErr []error) {
+func (self *goValidator) validateValueFromTag(tag, parentKey string, params *itemParams, fieldTypeInfo reflect.StructField, fieldInfo reflect.Value) (returnErr []error) {
 	validatorT := reflect.TypeOf((*Validator)(nil)).Elem()
 	validatorFT := reflect.TypeOf((*ValidatorF)(nil)).Elem()
 	title := fieldTypeInfo.Tag.Get(self.TitleTag)
 	args := strings.Split(tag, self.validatorSplit)
 	for _, argTmp := range args {
-		var vK string = argTmp
+		var vK = argTmp
 		var vArgs []string
 		//查找是否含有赋值符号
 		num := strings.Index(argTmp, VALIDATOR_VALUE_SIGN)
@@ -254,7 +264,7 @@ func (self *goValidator) validateValueFromTag(tag string, lazyFlag bool, fieldTy
 
 		if _, ok := self.validator[vK]; !ok {
 			returnErr = append(returnErr, fmt.Errorf("validator %v not exist", vK))
-			if lazyFlag {
+			if params.lazyFlag {
 				return
 			}
 			continue
@@ -263,21 +273,31 @@ func (self *goValidator) validateValueFromTag(tag string, lazyFlag bool, fieldTy
 		var validator Validator
 		tmpValidator := self.validator[vK]
 		vT := reflect.TypeOf(tmpValidator)
+		vV := reflect.ValueOf(tmpValidator)
 		if vT.ConvertibleTo(validatorFT) {
 			tmpV, ok := tmpValidator.(func(params map[string]interface{}, val reflect.Value, args ...string) (bool, error))
 			if !ok {
 				returnErr = append(returnErr, fmt.Errorf("validator %v error", vK))
-				if lazyFlag {
+				if params.lazyFlag {
 					return
 				}
 				continue
 			}
 			validator = ValidatorF(tmpV)
 		} else if vT.Implements(validatorT) {
-			validator = tmpValidator.(Validator)
+			if cacheValidator, ok := params.structValidator[vK]; ok {
+				validator = cacheValidator
+			} else if vT.Kind() == reflect.Ptr {
+				// defaultValidator 传的结构体指针，在并发条件下，会导致结构体值被覆盖，需要做对象拷贝
+				baseValidator := reflect.New(vV.Elem().Type()).Interface()
+				validator = baseValidator.(Validator)
+				params.structValidator[vK] = validator
+			} else {
+				validator = tmpValidator.(Validator)
+			}
 		} else {
 			returnErr = append(returnErr, fmt.Errorf("validator %v error", vK))
-			if lazyFlag {
+			if params.lazyFlag {
 				return
 			}
 			continue
@@ -286,15 +306,15 @@ func (self *goValidator) validateValueFromTag(tag string, lazyFlag bool, fieldTy
 		if title != "" {
 			name = title
 		}
-		var params = map[string]interface{}{
+		var innerParams = map[string]interface{}{
 			"name":    name,
-			"syncMap": syncMap,
+			"syncMap": params.syncMap,
 			"allKey":  parentKey + "_" + fieldTypeInfo.Name,
 		}
-		valid, err := validator.Validate(params, fieldInfo, vArgs...)
+		valid, err := validator.Validate(innerParams, fieldInfo, vArgs...)
 		if valid == false {
 			returnErr = append(returnErr, err)
-			if lazyFlag {
+			if params.lazyFlag {
 				return
 			}
 			continue
