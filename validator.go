@@ -165,6 +165,27 @@ func (self *goValidator) validate(s interface{}, parentKey string, params *itemP
 		typeValue = typeValue.Elem()
 	}
 	switch typeObj.Kind() {
+	case reflect.Map:
+		//判断是否需要递归
+		if ok, _ := checkArrayValueIsMulti(typeValue); !ok {
+			break
+		}
+		mapKeys := typeValue.MapKeys()
+		for _, key := range mapKeys {
+			tmpParentKey := fmt.Sprintf("%v_%v", parentKey, key.String())
+			mapItem := typeValue.MapIndex(key)
+			if !mapItem.CanInterface() {
+				continue
+			}
+			errArr = self.validate(mapItem.Interface(), tmpParentKey, params)
+			if len(errArr) > 0 {
+				returnErr = append(returnErr, errArr...)
+				if params.lazyFlag {
+					return
+				}
+				continue
+			}
+		}
 	case reflect.Slice, reflect.Array:
 		//判断是否需要递归
 		if ok, fieldNum := checkArrayValueIsMulti(typeValue); ok {
@@ -179,9 +200,6 @@ func (self *goValidator) validate(s interface{}, parentKey string, params *itemP
 					continue
 				}
 			}
-		} else {
-			//不需要递归
-			fmt.Println("======不递归=====>", typeValue)
 		}
 		break
 	case reflect.Struct:
@@ -216,6 +234,25 @@ func (self *goValidator) validate(s interface{}, parentKey string, params *itemP
 			}
 			//判断是否需要递归
 			if ok, fieldNum := checkArrayValueIsMulti(fieldInfo); ok {
+				if fieldInfo.Type().Kind() == reflect.Map {
+					mapKeys := fieldInfo.MapKeys()
+					for _, key := range mapKeys {
+						tmpParentKey := fmt.Sprintf("%v_%v", parentKey, key.String())
+						mapItem := fieldInfo.MapIndex(key)
+						if !mapItem.CanInterface() {
+							continue
+						}
+						errArr = self.validate(mapItem.Interface(), tmpParentKey, params)
+						if len(errArr) > 0 {
+							returnErr = append(returnErr, errArr...)
+							if params.lazyFlag {
+								return
+							}
+							continue
+						}
+					}
+					continue
+				}
 				for i := 0; i < fieldNum; i++ {
 					tmpParentKey := fmt.Sprintf("%v_%v", parentKey, fieldTypeInfo.Name)
 					errArr = self.validate(fieldInfo.Index(i).Interface(), tmpParentKey, params)
