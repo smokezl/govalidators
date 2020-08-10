@@ -71,9 +71,12 @@ func TestRequired(t *testing.T) {
 	testMap := []struct {
 		param    map[string]string `validate:"required"`
 		expected bool
+		mapStruct map[string]struct{}
 	}{
-		{map[string]string{"a": "aa", "b": "bb"}, true},
-		{map[string]string{}, false},
+		{map[string]string{"a": "aa", "b": "bb"}, true, map[string]struct{}{
+			"1": {},
+		}},
+		{map[string]string{}, false, map[string]struct{}{}},
 	}
 	for _, test := range testMap {
 		err := validator.Validate(test)
