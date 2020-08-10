@@ -120,6 +120,9 @@ func checkArrayValueIsMulti(value reflect.Value) (ok bool, fieldNum int) {
 	if !ok {
 		return
 	}
+	if kind == reflect.Map {
+		return false, 0
+	}
 	//检查值的类型是不是 map、array、map 或 struct
 	valueKind := value.Type().Elem().Kind()
 
