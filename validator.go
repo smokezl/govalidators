@@ -326,8 +326,9 @@ func (self *goValidator) validateValueFromTag(tag, parentKey string, params *ite
 				validator = cacheValidator
 			} else if vT.Kind() == reflect.Ptr {
 				// defaultValidator 传的结构体指针，在并发条件下，会导致结构体值被覆盖，需要做对象拷贝
-				baseValidator := reflect.New(vV.Elem().Type()).Interface()
-				validator = baseValidator.(Validator)
+				baseValidator := reflect.New(vV.Elem().Type())
+				baseValidator.Elem().Set(vV.Elem())
+				validator = baseValidator.Interface().(Validator)
 				params.structValidator[vK] = validator
 			} else {
 				validator = tmpValidator.(Validator)
